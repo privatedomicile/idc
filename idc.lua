@@ -26,7 +26,7 @@ local function loadScriptFromURL(url)
     end
 end
 
-local scriptURL = "url"
+local scriptURL = "https://github.com/privatedomicile/idc/raw/refs/heads/main/idc.lua"
 
 local function addReloadButton()
     local reloadButton = Instance.new("TextButton")
