@@ -1,4 +1,4 @@
--- idc if u skid 
+--idc if u skid
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,44 +8,102 @@ local player = Players.LocalPlayer
 -- Check if script is already running
 local gui = player:WaitForChild("PlayerGui"):FindFirstChild("PartsToggleGui")
 if gui then
-    -- If script is already running, just destroy the old GUI and continue
-    gui:Destroy()
-end
-
--- Function to load the script from a URL
-local function loadScriptFromURL(url)
-    local success, result = pcall(function()
-        return game:HttpGetAsync(url)
-    end)
+    -- Create confirmation dialog
+    local dialog = Instance.new("ScreenGui")
+    dialog.Name = "ScriptReloadDialog"
+    dialog.ResetOnSpawn = false
     
-    if success then
-        return loadstring(result)()
-    else
-        warn("Failed to load script:", result)
-        return nil
-    end
-end
-
-local scriptURL = "https://github.com/privatedomicile/idc/raw/refs/heads/main/idc.lua"
-
-local function addReloadButton()
-    local reloadButton = Instance.new("TextButton")
-    reloadButton.Size = UDim2.new(0.9, 0, 0, 30)
-    reloadButton.Position = UDim2.new(0.05, 0, 0.8, 0)
-    reloadButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-    reloadButton.TextColor3 = Color3.new(1, 1, 1)
-    reloadButton.Font = Enum.Font.GothamBold
-    reloadButton.TextSize = 14
-    reloadButton.Text = "Reload Script"
-    reloadButton.Parent = container
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 150)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -75)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    frame.BorderSizePixel = 0
+    frame.Parent = dialog
     
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 4)
-    corner.Parent = reloadButton
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
     
-    reloadButton.MouseButton1Click:Connect(function()
-        loadScriptFromURL(scriptURL)
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0.3, 0)
+    title.Position = UDim2.new(0, 0, 0.1, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "Script Already Running"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 18
+    title.TextYAlignment = Enum.TextYAlignment.Bottom
+    title.Parent = frame
+    
+    local message = Instance.new("TextLabel")
+    message.Size = UDim2.new(0.9, 0, 0.3, 0)
+    message.Position = UDim2.new(0.05, 0, 0.35, 0)
+    message.BackgroundTransparency = 1
+    message.Text = "Would you like to Rejoin? We are currently in BETA and are experiencing major bugs."
+    message.TextColor3 = Color3.fromRGB(200, 200, 200)
+    message.Font = Enum.Font.Gotham
+    message.TextSize = 14
+    message.TextWrapped = true
+    message.Parent = frame
+    
+    local function createButton(text, position, color, callback)
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(0.4, 0, 0.3, 0)
+        button.Position = position
+        button.BackgroundColor3 = color
+        button.TextColor3 = Color3.new(1, 1, 1)
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 14
+        button.Text = text
+        button.Parent = frame
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 4)
+        corner.Parent = button
+        
+        button.MouseButton1Click:Connect(function()
+            callback()
+            dialog:Destroy()
+            game:GetService("TeleportService"):Teleport(game.PlaceId, game:GetService("Players").LocalPlayer)
+        end)
+        
+        return button
+    end
+    
+    -- Add padding to the bottom of the dialog
+    frame.Size = UDim2.new(0, 300, 0, 180) -- Increased height for better spacing
+    
+    -- Position buttons higher up with better spacing
+    createButton("Yes", UDim2.new(0.05, 0, 0.65, 0), Color3.fromRGB(0, 120, 215), function()
+        -- Fade out before reloading
+        local fadeOut = TweenService:Create(frame, TweenInfo.new(0.3), {BackgroundTransparency = 1, Position = UDim2.new(0.5, -150, 0.3, 0)})
+        fadeOut:Play()
+        fadeOut.Completed:Wait()
+        gui:Destroy()
+        dialog:Destroy()
+        -- Create a new script instance and run it
+        local newScript = Instance.new("LocalScript")
+        newScript.Source = script.Source
+        newScript.Parent = script.Parent
+        newScript.Name = script.Name
+        script:Destroy()
     end)
+    
+    createButton("No", UDim2.new(0.55, 0, 0.65, 0), Color3.fromRGB(80, 80, 80), function()
+        local fadeOut = TweenService:Create(frame, TweenInfo.new(0.3), {BackgroundTransparency = 1, Position = UDim2.new(0.5, -150, 0.3, 0)})
+        fadeOut:Play()
+        fadeOut.Completed:Wait()
+        dialog:Destroy()
+    end)
+    
+    -- Fade in the dialog
+    frame.BackgroundTransparency = 1
+    frame.Position = UDim2.new(0.5, -150, 0.4, 0)
+    local fadeIn = TweenService:Create(frame, TweenInfo.new(0.3), {BackgroundTransparency = 0.2, Position = UDim2.new(0.5, -150, 0.5, -90)})
+    fadeIn:Play()
+    
+    dialog.Parent = player:WaitForChild("PlayerGui")
+    return
 end
 
 -- Initialize character and HRP references
