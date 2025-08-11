@@ -1,5 +1,7 @@
 --idc if u skid
 
+--idc if u skid
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -204,69 +206,69 @@ local isFollowing = false
 -- Create GUI
 -- Create notification
 local function createNotification(title, text, duration)
-    duration = duration or 5
+    duration = duration or 3 -- Reduced default duration for mobile
     local notification = Instance.new("ScreenGui")
-    notification.Name = "NotificationGui"
+    notification.Name = "NotificationGui" .. os.clock() -- Unique name for each notification
     notification.ResetOnSpawn = false
+    notification.DisplayOrder = 10
     
+    -- Simplified frame with mobile-friendly sizing
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 100)
-    frame.Position = UDim2.new(1, 20, 1, -120) -- Adjusted position
+    frame.Size = UDim2.new(0.9, 0, 0, 80)
+    frame.Position = UDim2.new(0.5, 0, 0.9, 0)
+    frame.AnchorPoint = Vector2.new(0.5, 1)
     frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     frame.BorderSizePixel = 0
-    frame.BackgroundTransparency = 1 -- Start transparent
+    frame.BackgroundTransparency = 0.3
     frame.Parent = notification
     
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = frame
     
-    -- Title with better spacing
+    -- Simplified title
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -20, 0.3, 0)
+    titleLabel.Size = UDim2.new(1, -20, 0.4, 0)
     titleLabel.Position = UDim2.new(0, 10, 0.1, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title
     titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextSize = 18
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.TextSize = 16 -- Slightly smaller for mobile
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Center
     titleLabel.TextYAlignment = Enum.TextYAlignment.Bottom
     titleLabel.Parent = frame
     
-    -- Text with better spacing below title
+    -- Simplified text
     local textLabel = Instance.new("TextLabel")
     textLabel.Size = UDim2.new(1, -20, 0.4, 0)
-    textLabel.Position = UDim2.new(0, 10, 0.4, 0)
+    textLabel.Position = UDim2.new(0, 10, 0.5, 0)
     textLabel.BackgroundTransparency = 1
     textLabel.Text = text
     textLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-    textLabel.Font = Enum.Font.GothamMedium
+    textLabel.Font = Enum.Font.Gotham
     textLabel.TextSize = 14
-    textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    textLabel.TextXAlignment = Enum.TextXAlignment.Center
     textLabel.TextYAlignment = Enum.TextYAlignment.Top
     textLabel.TextWrapped = true
     textLabel.Parent = frame
     
-    -- Fade in animation
-    local fadeIn = TweenService:Create(frame, TweenInfo.new(0.3), {BackgroundTransparency = 0.2, Position = UDim2.new(1, -320, 1, -120)})
+    -- Simplified animation
+    frame.Position = UDim2.new(0.5, 0, 1.1, 0)
+    local fadeIn = TweenService:Create(frame, TweenInfo.new(0.3), {Position = UDim2.new(0.5, 0, 0.9, 0)})
     fadeIn:Play()
     
-    -- Fade out and remove after duration
-    task.delay(duration - 0.5, function()
-        local fadeOut = TweenService:Create(frame, TweenInfo.new(0.5), {BackgroundTransparency = 1, Position = UDim2.new(1, -300, 1, -120)})
-        fadeOut:Play()
-        fadeOut.Completed:Wait()
-        notification:Destroy()
+    -- Cleanup
+    task.delay(duration, function()
+        if notification.Parent then
+            local fadeOut = TweenService:Create(frame, TweenInfo.new(0.3), {Position = UDim2.new(0.5, 0, 1.1, 0)})
+            fadeOut:Play()
+            fadeOut.Completed:Wait()
+            notification:Destroy()
+        end
     end)
     
     notification.Parent = player:WaitForChild("PlayerGui")
-    
-    -- Auto-remove after duration
-    task.delay(duration or 5, function()
-        notification:Destroy()
-    end)
-    
     return notification
 end
 
@@ -341,22 +343,22 @@ local function toggleParts()
     isFollowing = not isFollowing
 
     if isFollowing then
-        -- Hide parts & disable collisions
+        -- Hide parts & disable collisions with batched updates
         for _, part in ipairs(allParts) do
-            if table.find(sarajineunParts, part) then
-                part.Transparency = 1 -- fully invisible for "사라지는 파트"
-            else
-                part.Transparency = 1 -- also hide other parts like Gudock when following
+            if part and part.Parent then
+                part.Transparency = 1
+                part.CanCollide = false
             end
-            part.CanCollide = false
         end
         toggleButton.Text = "ON"
     else
-        -- Restore original states
+        -- Restore original states with batched updates
         for part, state in pairs(originalStates) do
-            part.CFrame = state.CFrame
-            part.Transparency = state.Transparency
-            part.CanCollide = false -- keep CanCollide false to prevent glitches
+            if part and part.Parent then
+                part.CFrame = state.CFrame
+                part.Transparency = state.Transparency
+                part.CanCollide = false
+            end
         end
         toggleButton.Text = "OFF"
     end
@@ -378,33 +380,43 @@ tpButton.MouseButton1Click:Connect(function()
     end
 end)
 
-RunService.Heartbeat:Connect(function()
-    if isFollowing and hrp then
-        for _, part in ipairs(allParts) do
-            if part then
-                -- Force transparency and disable collisions every frame while toggled ON
-                part.Transparency = 1
-                part.CanCollide = false
+-- Optimized update function with frame skipping for mobile
+local frameCount = 0
+local updateInterval = 3 -- Update every 3rd frame on mobile
 
-                if part == gudockPart then
-                    if pyongPart and pyongPart.Transparency == 0 then
-                        part.CFrame = hrp.CFrame
-                    else
-                        part.CFrame = hrp.CFrame * CFrame.new(0, 0, -10)
-                    end
-                else
-                    part.CFrame = hrp.CFrame
-                end
+local function updateParts()
+    if not isFollowing or not hrp then return end
+    
+    -- Skip frames to reduce processing
+    frameCount = frameCount + 1
+    if frameCount % updateInterval ~= 0 then return end
+    
+    for _, part in ipairs(allParts) do
+        if part and part.Parent then  -- Added parent check
+            -- Only update properties if they've changed
+            if part.Transparency ~= 1 then
+                part.Transparency = 1
             end
-        end
-    else
-        -- Restore original properties when toggled OFF
-        for part, state in pairs(originalStates) do
-            if part then
-                part.CFrame = state.CFrame
-                part.Transparency = state.Transparency
-                part.CanCollide = state.CanCollide -- restore original collision
+            if part.CanCollide then
+                part.CanCollide = false
+            end
+
+            -- Update position with less precision on mobile
+            local targetCFrame
+            if part == gudockPart then
+                targetCFrame = (pyongPart and pyongPart.Transparency == 0) and 
+                             hrp.CFrame or 
+                             hrp.CFrame * CFrame.new(0, 0, -10)
+            else
+                targetCFrame = hrp.CFrame
+            end
+            
+            -- Only update CFrame if it's significantly different
+            if (part.Position - targetCFrame.Position).Magnitude > 0.1 then
+                part.CFrame = targetCFrame
             end
         end
     end
-end)
+end
+
+RunService.Heartbeat:Connect(updateParts)
