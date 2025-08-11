@@ -1,6 +1,5 @@
 --idc if u skid
 
---idc if u skid
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
