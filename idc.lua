@@ -1,6 +1,5 @@
 --idc if u skid
 
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -120,7 +119,8 @@ if player.Character then
 end
 player.CharacterAdded:Connect(setupCharacter)
 
-local positionTolerance = 0.01
+-- Increased tolerance for better compatibility with mobile and low-level executors
+local positionTolerance = 1.0  -- Increased from 0.01 to 1.0 for better tolerance
 
 local sarajineunPartsCFrames = {
     CFrame.new(33.4529037, 165.803314, 33.7354202),
@@ -136,33 +136,102 @@ local pyongCFrame = CFrame.new(33.4528961, 165.803314, 72.7353821)
 
 local function findPartsByNameAndPositions(name, cframes, tol)
     local foundParts = {}
-    for _, part in ipairs(workspace:GetChildren()) do
+    local allParts = workspace:GetDescendants()
+    
+    -- First try exact position match
+    for _, part in ipairs(allParts) do
         if part:IsA("BasePart") and part.Name == name then
             for _, cf in ipairs(cframes) do
                 if (part.Position - cf.Position).Magnitude <= tol then
                     table.insert(foundParts, part)
+                    print("Found part by exact position:", part:GetFullName(), "at", part.Position)
                     break
                 end
             end
         end
     end
+    
+    -- If no parts found, try to find by name only as fallback
+    if #foundParts == 0 then
+        print("No parts found by position, trying name only...")
+        for _, part in ipairs(allParts) do
+            if part:IsA("BasePart") and part.Name == name then
+                table.insert(foundParts, part)
+                print("Found part by name only:", part:GetFullName(), "at", part.Position)
+            end
+        end
+    end
+    
     return foundParts
 end
 
 local function findPartByNameAndPosition(name, cf, tol)
-    for _, part in ipairs(workspace:GetChildren()) do
+    local allParts = workspace:GetDescendants()
+    
+    -- First try exact position match
+    for _, part in ipairs(allParts) do
         if part:IsA("BasePart") and part.Name == name then
             if (part.Position - cf.Position).Magnitude <= tol then
+                print("Found part by exact position:", part:GetFullName(), "at", part.Position)
                 return part
             end
         end
     end
+    
+    -- If not found, try to find by name only as fallback
+    print("Part not found by position, trying name only for:", name)
+    for _, part in ipairs(allParts) do
+        if part:IsA("BasePart") and part.Name == name then
+            print("Found part by name only:", part:GetFullName(), "at", part.Position)
+            return part
+        end
+    end
+    
     return nil
 end
 
-local sarajineunParts = findPartsByNameAndPositions("사라지는 파트", sarajineunPartsCFrames, positionTolerance)
-local gudockPart = findPartByNameAndPosition(gudockName, gudockCFrame, positionTolerance)
-local pyongPart = findPartByNameAndPosition(pyongName, pyongCFrame, positionTolerance)
+-- Add debug prints to help identify parts
+print("Searching for parts...")
+print("Position tolerance:", positionTolerance)
+
+-- Find parts with retry mechanism
+local function findPartsWithRetry()
+    local parts = {}
+    local maxRetries = 3
+    local retryDelay = 1
+    
+    for attempt = 1, maxRetries do
+        print(string.format("Attempt %d of %d to find parts...", attempt, maxRetries))
+        
+        -- Find parts
+        local sarajineunParts = findPartsByNameAndPositions("사라지는 파트", sarajineunPartsCFrames, positionTolerance)
+        local gudockPart = findPartByNameAndPosition(gudockName, gudockCFrame, positionTolerance)
+        local pyongPart = findPartByNameAndPosition(pyongName, pyongCFrame, positionTolerance)
+        
+        -- Check if we found everything
+        if #sarajineunParts > 0 and gudockPart and pyongPart then
+            print("All parts found successfully!")
+            return sarajineunParts, gudockPart, pyongPart
+        end
+        
+        -- If not all parts found, wait and try again
+        if attempt < maxRetries then
+            print(string.format("Some parts not found, retrying in %.1f seconds...", retryDelay))
+            wait(retryDelay)
+            retryDelay = retryDelay * 1.5  -- Exponential backoff
+        end
+    end
+    
+    -- If we get here, we've exhausted all retries
+    warn("Failed to find all parts after", maxRetries, "attempts")
+    return {findPartByNameAndPosition("사라지는 파트", sarajineunPartsCFrames[1], math.huge) or 
+            findPartByNameAndPosition("사라지는 파트", nil, math.huge) or {}},
+           findPartByNameAndPosition(gudockName, gudockCFrame, math.huge),
+           findPartByNameAndPosition(pyongName, pyongCFrame, math.huge)
+end
+
+-- Find all parts with retry mechanism
+local sarajineunParts, gudockPart, pyongPart = findPartsWithRetry()
 
 local allParts = {}
 
@@ -181,8 +250,26 @@ if not pyongPart then
 end
 
 if #allParts == 0 then
-    warn("No target parts found!")
-    return
+    -- Try one last time with maximum tolerance
+    warn("No target parts found with normal search, trying with maximum tolerance...")
+    
+    -- Try to find any parts by name only
+    for _, name in ipairs({"사라지는 파트", gudockName, pyongName}) do
+        for _, part in ipairs(workspace:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name == name then
+                table.insert(allParts, part)
+                print("Found part as last resort:", part:GetFullName())
+            end
+        end
+    end
+    
+    if #allParts == 0 then
+        -- If still no parts found, show an error message but don't return
+        warn("WARNING: No target parts found! The script will continue but may not work correctly.")
+        createNotification("Warning", "Some parts not found! The script may not work correctly.", 10)
+    else
+        createNotification("Info", "Some parts found with relaxed search. The script may work partially.", 5)
+    end
 end
 
 -- Store original states for each part
@@ -211,11 +298,11 @@ local function createNotification(title, text, duration)
     notification.ResetOnSpawn = false
     notification.DisplayOrder = 10
     
-    -- Simplified frame with mobile-friendly sizing
+    -- Simplified frame with mobile-friendly sizing - positioned at top
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0.9, 0, 0, 80)
-    frame.Position = UDim2.new(0.5, 0, 0.9, 0)
-    frame.AnchorPoint = Vector2.new(0.5, 1)
+    frame.Position = UDim2.new(0.5, 0, 0, 10)  -- Positioned at top with 10px margin
+    frame.AnchorPoint = Vector2.new(0.5, 0)  -- Anchored to top center
     frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     frame.BorderSizePixel = 0
     frame.BackgroundTransparency = 0.3
@@ -252,15 +339,15 @@ local function createNotification(title, text, duration)
     textLabel.TextWrapped = true
     textLabel.Parent = frame
     
-    -- Simplified animation
-    frame.Position = UDim2.new(0.5, 0, 1.1, 0)
-    local fadeIn = TweenService:Create(frame, TweenInfo.new(0.3), {Position = UDim2.new(0.5, 0, 0.9, 0)})
+    -- Simplified animation - slides down from top
+    frame.Position = UDim2.new(0.5, 0, -0.2, 0)  -- Start above the screen
+    local fadeIn = TweenService:Create(frame, TweenInfo.new(0.3), {Position = UDim2.new(0.5, 0, 0, 10)})  -- Slide down to top
     fadeIn:Play()
     
     -- Cleanup
     task.delay(duration, function()
         if notification.Parent then
-            local fadeOut = TweenService:Create(frame, TweenInfo.new(0.3), {Position = UDim2.new(0.5, 0, 1.1, 0)})
+            local fadeOut = TweenService:Create(frame, TweenInfo.new(0.3), {Position = UDim2.new(0.5, 0, -0.2, 0)})  -- Slide back up
             fadeOut:Play()
             fadeOut.Completed:Wait()
             notification:Destroy()
