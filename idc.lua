@@ -1,13 +1,9 @@
 --idc if u skid
 
--- Basic services
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-
--- Disable complex features for low-level executors
-local LOW_LEVEL_MODE = true
+local player = Players.LocalPlayer
 
 -- Check if script is already running
 local gui = player:WaitForChild("PlayerGui"):FindFirstChild("PartsToggleGui")
@@ -123,8 +119,7 @@ if player.Character then
 end
 player.CharacterAdded:Connect(setupCharacter)
 
--- Increased tolerance for better compatibility with mobile and low-level executors
-local positionTolerance = 1.0  -- Increased from 0.01 to 1.0 for better tolerance
+local positionTolerance = 0.01
 
 local sarajineunPartsCFrames = {
     CFrame.new(33.4529037, 165.803314, 33.7354202),
@@ -140,102 +135,33 @@ local pyongCFrame = CFrame.new(33.4528961, 165.803314, 72.7353821)
 
 local function findPartsByNameAndPositions(name, cframes, tol)
     local foundParts = {}
-    local allParts = workspace:GetDescendants()
-    
-    -- First try exact position match
-    for _, part in ipairs(allParts) do
+    for _, part in ipairs(workspace:GetChildren()) do
         if part:IsA("BasePart") and part.Name == name then
             for _, cf in ipairs(cframes) do
                 if (part.Position - cf.Position).Magnitude <= tol then
                     table.insert(foundParts, part)
-                    print("Found part by exact position:", part:GetFullName(), "at", part.Position)
                     break
                 end
             end
         end
     end
-    
-    -- If no parts found, try to find by name only as fallback
-    if #foundParts == 0 then
-        print("No parts found by position, trying name only...")
-        for _, part in ipairs(allParts) do
-            if part:IsA("BasePart") and part.Name == name then
-                table.insert(foundParts, part)
-                print("Found part by name only:", part:GetFullName(), "at", part.Position)
-            end
-        end
-    end
-    
     return foundParts
 end
 
 local function findPartByNameAndPosition(name, cf, tol)
-    local allParts = workspace:GetDescendants()
-    
-    -- First try exact position match
-    for _, part in ipairs(allParts) do
+    for _, part in ipairs(workspace:GetChildren()) do
         if part:IsA("BasePart") and part.Name == name then
             if (part.Position - cf.Position).Magnitude <= tol then
-                print("Found part by exact position:", part:GetFullName(), "at", part.Position)
                 return part
             end
         end
     end
-    
-    -- If not found, try to find by name only as fallback
-    print("Part not found by position, trying name only for:", name)
-    for _, part in ipairs(allParts) do
-        if part:IsA("BasePart") and part.Name == name then
-            print("Found part by name only:", part:GetFullName(), "at", part.Position)
-            return part
-        end
-    end
-    
     return nil
 end
 
--- Add debug prints to help identify parts
-print("Searching for parts...")
-print("Position tolerance:", positionTolerance)
-
--- Find parts with retry mechanism
-local function findPartsWithRetry()
-    local parts = {}
-    local maxRetries = 3
-    local retryDelay = 1
-    
-    for attempt = 1, maxRetries do
-        print(string.format("Attempt %d of %d to find parts...", attempt, maxRetries))
-        
-        -- Find parts
-        local sarajineunParts = findPartsByNameAndPositions("사라지는 파트", sarajineunPartsCFrames, positionTolerance)
-        local gudockPart = findPartByNameAndPosition(gudockName, gudockCFrame, positionTolerance)
-        local pyongPart = findPartByNameAndPosition(pyongName, pyongCFrame, positionTolerance)
-        
-        -- Check if we found everything
-        if #sarajineunParts > 0 and gudockPart and pyongPart then
-            print("All parts found successfully!")
-            return sarajineunParts, gudockPart, pyongPart
-        end
-        
-        -- If not all parts found, wait and try again
-        if attempt < maxRetries then
-            print(string.format("Some parts not found, retrying in %.1f seconds...", retryDelay))
-            wait(retryDelay)
-            retryDelay = retryDelay * 1.5  -- Exponential backoff
-        end
-    end
-    
-    -- If we get here, we've exhausted all retries
-    warn("Failed to find all parts after", maxRetries, "attempts")
-    return {findPartByNameAndPosition("사라지는 파트", sarajineunPartsCFrames[1], math.huge) or 
-            findPartByNameAndPosition("사라지는 파트", nil, math.huge) or {}},
-           findPartByNameAndPosition(gudockName, gudockCFrame, math.huge),
-           findPartByNameAndPosition(pyongName, pyongCFrame, math.huge)
-end
-
--- Find all parts with retry mechanism
-local sarajineunParts, gudockPart, pyongPart = findPartsWithRetry()
+local sarajineunParts = findPartsByNameAndPositions("사라지는 파트", sarajineunPartsCFrames, positionTolerance)
+local gudockPart = findPartByNameAndPosition(gudockName, gudockCFrame, positionTolerance)
+local pyongPart = findPartByNameAndPosition(pyongName, pyongCFrame, positionTolerance)
 
 local allParts = {}
 
@@ -254,26 +180,8 @@ if not pyongPart then
 end
 
 if #allParts == 0 then
-    -- Try one last time with maximum tolerance
-    warn("No target parts found with normal search, trying with maximum tolerance...")
-    
-    -- Try to find any parts by name only
-    for _, name in ipairs({"사라지는 파트", gudockName, pyongName}) do
-        for _, part in ipairs(workspace:GetDescendants()) do
-            if part:IsA("BasePart") and part.Name == name then
-                table.insert(allParts, part)
-                print("Found part as last resort:", part:GetFullName())
-            end
-        end
-    end
-    
-    if #allParts == 0 then
-        -- If still no parts found, show an error message but don't return
-        warn("WARNING: No target parts found! The script will continue but may not work correctly.")
-        createNotification("Warning", "Some parts not found! The script may not work correctly.", 10)
-    else
-        createNotification("Info", "Some parts found with relaxed search. The script may work partially.", 5)
-    end
+    warn("No target parts found!")
+    return
 end
 
 -- Store original states for each part
@@ -296,59 +204,67 @@ local isFollowing = false
 -- Create GUI
 -- Create notification
 local function createNotification(title, text, duration)
-    if LOW_LEVEL_MODE then
-        -- Ultra-simple notification for low-level executors
-        print("[NOTIFICATION] " .. title .. ": " .. text)
-        return
-    end
-    
-    duration = duration or 3
+    duration = duration or 5
     local notification = Instance.new("ScreenGui")
-    notification.Name = "Notification" .. tick()
+    notification.Name = "NotificationGui"
     notification.ResetOnSpawn = false
     
-    -- Simple frame
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0.9, 0, 0, 60)
-    frame.Position = UDim2.new(0.5, 0, 0.1, 0)
-    frame.AnchorPoint = Vector2.new(0.5, 0)
+    frame.Size = UDim2.new(0, 300, 0, 100)
+    frame.Position = UDim2.new(1, 20, 1, -120) -- Adjusted position
     frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     frame.BorderSizePixel = 0
+    frame.BackgroundTransparency = 1 -- Start transparent
     frame.Parent = notification
     
-    -- Simple title
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+    
+    -- Title with better spacing
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -10, 0.4, 0)
-    titleLabel.Position = UDim2.new(0, 5, 0, 5)
+    titleLabel.Size = UDim2.new(1, -20, 0.3, 0)
+    titleLabel.Position = UDim2.new(0, 10, 0.1, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title
-    titleLabel.TextColor3 = Color3.new(1, 1, 1)
-    titleLabel.Font = Enum.Font.SourceSansBold
-    titleLabel.TextSize = 14
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 18
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.TextYAlignment = Enum.TextYAlignment.Bottom
     titleLabel.Parent = frame
     
-    -- Simple text
+    -- Text with better spacing below title
     local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, -10, 0.5, 0)
-    textLabel.Position = UDim2.new(0, 5, 0.4, 0)
+    textLabel.Size = UDim2.new(1, -20, 0.4, 0)
+    textLabel.Position = UDim2.new(0, 10, 0.4, 0)
     textLabel.BackgroundTransparency = 1
     textLabel.Text = text
-    textLabel.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-    textLabel.Font = Enum.Font.SourceSans
-    textLabel.TextSize = 12
+    textLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    textLabel.Font = Enum.Font.GothamMedium
+    textLabel.TextSize = 14
     textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    textLabel.TextYAlignment = Enum.TextYAlignment.Top
     textLabel.TextWrapped = true
     textLabel.Parent = frame
     
-    -- No animations for low-level compatibility
+    -- Fade in animation
+    local fadeIn = TweenService:Create(frame, TweenInfo.new(0.3), {BackgroundTransparency = 0.2, Position = UDim2.new(1, -320, 1, -120)})
+    fadeIn:Play()
+    
+    -- Fade out and remove after duration
+    task.delay(duration - 0.5, function()
+        local fadeOut = TweenService:Create(frame, TweenInfo.new(0.5), {BackgroundTransparency = 1, Position = UDim2.new(1, -300, 1, -120)})
+        fadeOut:Play()
+        fadeOut.Completed:Wait()
+        notification:Destroy()
+    end)
+    
     notification.Parent = player:WaitForChild("PlayerGui")
     
-    -- Auto-remove
-    delay(duration, function()
-        if notification.Parent then
-            notification:Destroy()
-        end
+    -- Auto-remove after duration
+    task.delay(duration or 5, function()
+        notification:Destroy()
     end)
     
     return notification
@@ -425,22 +341,22 @@ local function toggleParts()
     isFollowing = not isFollowing
 
     if isFollowing then
-        -- Hide parts & disable collisions with batched updates
+        -- Hide parts & disable collisions
         for _, part in ipairs(allParts) do
-            if part and part.Parent then
-                part.Transparency = 1
-                part.CanCollide = false
+            if table.find(sarajineunParts, part) then
+                part.Transparency = 1 -- fully invisible for "사라지는 파트"
+            else
+                part.Transparency = 1 -- also hide other parts like Gudock when following
             end
+            part.CanCollide = false
         end
         toggleButton.Text = "ON"
     else
-        -- Restore original states with batched updates
+        -- Restore original states
         for part, state in pairs(originalStates) do
-            if part and part.Parent then
-                part.CFrame = state.CFrame
-                part.Transparency = state.Transparency
-                part.CanCollide = false
-            end
+            part.CFrame = state.CFrame
+            part.Transparency = state.Transparency
+            part.CanCollide = false -- keep CanCollide false to prevent glitches
         end
         toggleButton.Text = "OFF"
     end
@@ -462,33 +378,33 @@ tpButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Simple update function for low-level executors
-local function updateParts()
-    if not isFollowing or not hrp then return end
-    
-    for _, part in ipairs(allParts) do
-        if part and part.Parent then
-            -- Minimal property updates
-            part.Transparency = 1
-            part.CanCollide = false
-            
-            -- Simple position update
-            if part == gudockPart and pyongPart and pyongPart.Transparency == 0 then
-                part.CFrame = hrp.CFrame
-            elseif part == gudockPart then
-                part.CFrame = hrp.CFrame * CFrame.new(0, 0, -10)
-            else
-                part.CFrame = hrp.CFrame
+RunService.Heartbeat:Connect(function()
+    if isFollowing and hrp then
+        for _, part in ipairs(allParts) do
+            if part then
+                -- Force transparency and disable collisions every frame while toggled ON
+                part.Transparency = 1
+                part.CanCollide = false
+
+                if part == gudockPart then
+                    if pyongPart and pyongPart.Transparency == 0 then
+                        part.CFrame = hrp.CFrame
+                    else
+                        part.CFrame = hrp.CFrame * CFrame.new(0, 0, -10)
+                    end
+                else
+                    part.CFrame = hrp.CFrame
+                end
             end
         end
-    end
-end
-
--- Simple update loop for low-level executors
-spawn(function()
-    while wait(0.1) do  -- Reduced update frequency
-        if isFollowing then
-            updateParts()
+    else
+        -- Restore original properties when toggled OFF
+        for part, state in pairs(originalStates) do
+            if part then
+                part.CFrame = state.CFrame
+                part.Transparency = state.Transparency
+                part.CanCollide = state.CanCollide -- restore original collision
+            end
         end
     end
 end)
