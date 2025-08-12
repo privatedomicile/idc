@@ -133,25 +133,73 @@ local gudockCFrame = CFrame.new(38.4866753, 167.326248, 86.7648621, 0, 0, -1, 1,
 local pyongName = "Pyong"
 local pyongCFrame = CFrame.new(33.4528961, 165.803314, 72.7353821)
 
+-- Cache for found parts to avoid redundant searches
+local partCache = {}
+local lastCacheClear = tick()
+local CACHE_LIFETIME = 10 -- Clear cache every 10 seconds
+
+-- More efficient distance check using squared magnitude (avoids expensive sqrt operation)
+local function isInRange(pos1, pos2, range)
+    local dx = pos1.X - pos2.X
+    local dy = pos1.Y - pos2.Y
+    local dz = pos1.Z - pos2.Z
+    return (dx*dx + dy*dy + dz*dz) <= (range * range)
+end
+
 local function findPartsByNameAndPositions(name, cframes, tol)
+    -- Clear cache if it's been a while
+    if tick() - lastCacheClear > CACHE_LIFETIME then
+        partCache = {}
+        lastCacheClear = tick()
+    end
+    
+    -- Check cache first
+    local cacheKey = name .. "_" .. table.concat(cframes, "_")
+    if partCache[cacheKey] then
+        return partCache[cacheKey]
+    end
+    
     local foundParts = {}
-    for _, part in ipairs(workspace:GetChildren()) do
+    local workspaceChildren = workspace:GetChildren()
+    
+    -- First pass: collect all parts with matching name
+    local potentialParts = {}
+    for i = 1, #workspaceChildren do
+        local part = workspaceChildren[i]
         if part:IsA("BasePart") and part.Name == name then
-            for _, cf in ipairs(cframes) do
-                if (part.Position - cf.Position).Magnitude <= tol then
-                    table.insert(foundParts, part)
-                    break
-                end
+            potentialParts[#potentialParts + 1] = part
+        end
+    end
+    
+    -- Second pass: check positions against cframes
+    for i = 1, #potentialParts do
+        local part = potentialParts[i]
+        for j = 1, #cframes do
+            if isInRange(part.Position, cframes[j].Position, tol) then
+                foundParts[#foundParts + 1] = part
+                break
             end
         end
     end
+    
+    -- Cache the result
+    partCache[cacheKey] = foundParts
     return foundParts
 end
 
 local function findPartByNameAndPosition(name, cf, tol)
-    for _, part in ipairs(workspace:GetChildren()) do
+    -- Check cache first
+    local cacheKey = name .. "_" .. tostring(cf.Position)
+    if partCache[cacheKey] then
+        return partCache[cacheKey]
+    end
+    
+    local workspaceChildren = workspace:GetChildren()
+    for i = 1, #workspaceChildren do
+        local part = workspaceChildren[i]
         if part:IsA("BasePart") and part.Name == name then
-            if (part.Position - cf.Position).Magnitude <= tol then
+            if isInRange(part.Position, cf.Position, tol) then
+                partCache[cacheKey] = part
                 return part
             end
         end
