@@ -1,9 +1,13 @@
 --idc if u skid
 
+-- Basic services
 local Players = game:GetService("Players")
+local player = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local player = Players.LocalPlayer
+
+-- Disable complex features for low-level executors
+local LOW_LEVEL_MODE = true
 
 -- Check if script is already running
 local gui = player:WaitForChild("PlayerGui"):FindFirstChild("PartsToggleGui")
@@ -292,69 +296,61 @@ local isFollowing = false
 -- Create GUI
 -- Create notification
 local function createNotification(title, text, duration)
-    duration = duration or 3 -- Reduced default duration for mobile
-    local notification = Instance.new("ScreenGui")
-    notification.Name = "NotificationGui" .. os.clock() -- Unique name for each notification
-    notification.ResetOnSpawn = false
-    notification.DisplayOrder = 10
+    if LOW_LEVEL_MODE then
+        -- Ultra-simple notification for low-level executors
+        print("[NOTIFICATION] " .. title .. ": " .. text)
+        return
+    end
     
-    -- Simplified frame with mobile-friendly sizing - positioned at top
+    duration = duration or 3
+    local notification = Instance.new("ScreenGui")
+    notification.Name = "Notification" .. tick()
+    notification.ResetOnSpawn = false
+    
+    -- Simple frame
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0.9, 0, 0, 80)
-    frame.Position = UDim2.new(0.5, 0, 0, 10)  -- Positioned at top with 10px margin
-    frame.AnchorPoint = Vector2.new(0.5, 0)  -- Anchored to top center
+    frame.Size = UDim2.new(0.9, 0, 0, 60)
+    frame.Position = UDim2.new(0.5, 0, 0.1, 0)
+    frame.AnchorPoint = Vector2.new(0.5, 0)
     frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     frame.BorderSizePixel = 0
-    frame.BackgroundTransparency = 0.3
     frame.Parent = notification
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = frame
-    
-    -- Simplified title
+    -- Simple title
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -20, 0.4, 0)
-    titleLabel.Position = UDim2.new(0, 10, 0.1, 0)
+    titleLabel.Size = UDim2.new(1, -10, 0.4, 0)
+    titleLabel.Position = UDim2.new(0, 5, 0, 5)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextSize = 16 -- Slightly smaller for mobile
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Center
-    titleLabel.TextYAlignment = Enum.TextYAlignment.Bottom
+    titleLabel.TextColor3 = Color3.new(1, 1, 1)
+    titleLabel.Font = Enum.Font.SourceSansBold
+    titleLabel.TextSize = 14
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Parent = frame
     
-    -- Simplified text
+    -- Simple text
     local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, -20, 0.4, 0)
-    textLabel.Position = UDim2.new(0, 10, 0.5, 0)
+    textLabel.Size = UDim2.new(1, -10, 0.5, 0)
+    textLabel.Position = UDim2.new(0, 5, 0.4, 0)
     textLabel.BackgroundTransparency = 1
     textLabel.Text = text
-    textLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-    textLabel.Font = Enum.Font.Gotham
-    textLabel.TextSize = 14
-    textLabel.TextXAlignment = Enum.TextXAlignment.Center
-    textLabel.TextYAlignment = Enum.TextYAlignment.Top
+    textLabel.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+    textLabel.Font = Enum.Font.SourceSans
+    textLabel.TextSize = 12
+    textLabel.TextXAlignment = Enum.TextXAlignment.Left
     textLabel.TextWrapped = true
     textLabel.Parent = frame
     
-    -- Simplified animation - slides down from top
-    frame.Position = UDim2.new(0.5, 0, -0.2, 0)  -- Start above the screen
-    local fadeIn = TweenService:Create(frame, TweenInfo.new(0.3), {Position = UDim2.new(0.5, 0, 0, 10)})  -- Slide down to top
-    fadeIn:Play()
+    -- No animations for low-level compatibility
+    notification.Parent = player:WaitForChild("PlayerGui")
     
-    -- Cleanup
-    task.delay(duration, function()
+    -- Auto-remove
+    delay(duration, function()
         if notification.Parent then
-            local fadeOut = TweenService:Create(frame, TweenInfo.new(0.3), {Position = UDim2.new(0.5, 0, -0.2, 0)})  -- Slide back up
-            fadeOut:Play()
-            fadeOut.Completed:Wait()
             notification:Destroy()
         end
     end)
     
-    notification.Parent = player:WaitForChild("PlayerGui")
     return notification
 end
 
@@ -466,43 +462,33 @@ tpButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Optimized update function with frame skipping for mobile
-local frameCount = 0
-local updateInterval = 3 -- Update every 3rd frame on mobile
-
+-- Simple update function for low-level executors
 local function updateParts()
     if not isFollowing or not hrp then return end
     
-    -- Skip frames to reduce processing
-    frameCount = frameCount + 1
-    if frameCount % updateInterval ~= 0 then return end
-    
     for _, part in ipairs(allParts) do
-        if part and part.Parent then  -- Added parent check
-            -- Only update properties if they've changed
-            if part.Transparency ~= 1 then
-                part.Transparency = 1
-            end
-            if part.CanCollide then
-                part.CanCollide = false
-            end
-
-            -- Update position with less precision on mobile
-            local targetCFrame
-            if part == gudockPart then
-                targetCFrame = (pyongPart and pyongPart.Transparency == 0) and 
-                             hrp.CFrame or 
-                             hrp.CFrame * CFrame.new(0, 0, -10)
-            else
-                targetCFrame = hrp.CFrame
-            end
+        if part and part.Parent then
+            -- Minimal property updates
+            part.Transparency = 1
+            part.CanCollide = false
             
-            -- Only update CFrame if it's significantly different
-            if (part.Position - targetCFrame.Position).Magnitude > 0.1 then
-                part.CFrame = targetCFrame
+            -- Simple position update
+            if part == gudockPart and pyongPart and pyongPart.Transparency == 0 then
+                part.CFrame = hrp.CFrame
+            elseif part == gudockPart then
+                part.CFrame = hrp.CFrame * CFrame.new(0, 0, -10)
+            else
+                part.CFrame = hrp.CFrame
             end
         end
     end
 end
 
-RunService.Heartbeat:Connect(updateParts)
+-- Simple update loop for low-level executors
+spawn(function()
+    while wait(0.1) do  -- Reduced update frequency
+        if isFollowing then
+            updateParts()
+        end
+    end
+end)
